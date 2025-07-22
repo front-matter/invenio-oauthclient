@@ -88,7 +88,7 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
     ):
         """Constructor."""
         # Set base_url first
-        base_url = base_url or "https://demo.pocket-id.org"
+        base_url = base_url or "https://demo.pocket-id.org/"
 
         precedence_mask = precedence_mask or {
             "email": True,
@@ -107,8 +107,8 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             app_key=app_key or "POCKETID_APP_CREDENTIALS",
             base_url=base_url,
             request_token_params={"scope": "openid profile email groups"},
-            access_token_url=access_token_url or f"{base_url}/api/oidc/token",
-            authorize_url=authorize_url or f"{base_url}/authorize",
+            access_token_url=access_token_url or f"{base_url}api/oidc/token",
+            authorize_url=authorize_url or f"{base_url}authorize",
             content_type="application/json",
             precedence_mask=precedence_mask,
             signup_options=signup_options,
@@ -144,7 +144,7 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
     @property
     def user_info_url(self):
         """Return the URL to fetch user info."""
-        return f"{self.base_url}/api/oidc/userinfo"
+        return f"{self.base_url}api/oidc/userinfo"
 
     def get_handlers(self):
         """Return Pocket ID auth handlers."""
