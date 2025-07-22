@@ -198,31 +198,22 @@ def get_user_info(remote):
         ) from e
 
 
-def account_info_serializer(remote, resp, user_info=None, **kwargs):
+def account_info_serializer(remote, resp, user_info, **kwargs):
     """Serialize the account info response object.
 
     :param remote: The remote application.
     :param resp: The response of the `authorized` endpoint.
-    :param user_info: User info from userinfo endpoint.
+    :param user_info: The response of the `user info` endpoint.
     :returns: A dictionary with serialized user information.
     """
-    if not user_info:
-        raise ValueError("User info is required for account serialization")
-
-    # Extract external ID from 'sub' claim (standard OIDC)
-    external_id = user_info.get("sub")
-    if not external_id:
-        raise ValueError("Subject identifier (sub) is required")
-
     return {
-        "external_id": external_id,
+        "external_id": user_info["sub"],
         "external_method": remote.name,
         "user": {
-            "email": user_info.get("email"),
             "profile": {
-                "username": user_info.get("preferred_username", ""),
-                "full_name": user_info.get("name", ""),
+                "full_name": user_info.get("name"),
             },
+            "email": user_info.get("email"),
         },
     }
 
@@ -250,16 +241,12 @@ def account_info(remote, resp):
     :param resp: The response of the `authorized` endpoint.
     :returns: A dictionary with the user information.
     """
-    try:
-        user_info = get_user_info(remote)
+    user_info_url = f"{remote.base_url}/oidc/userinfo"
+    user_info = remote.get(user_info_url).data
 
-        handlers = current_oauthclient.signup_handlers[remote.name]
-        # `remote` param automatically injected via `make_handler` helper
-        return handlers["info_serializer"](resp, user_info=user_info)
-
-    except Exception as e:
-        current_app.logger.error(f"Failed to get account info: {str(e)}")
-        raise
+    handlers = current_oauthclient.signup_handlers[remote.name]
+    # `remote` param automatically injected via `make_handler` helper
+    return handlers["info_serializer"](resp, user_info)
 
 
 @require_more_than_one_external_account
