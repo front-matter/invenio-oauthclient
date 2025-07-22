@@ -203,12 +203,22 @@ def account_info(remote, resp):
     :param resp: The response of the `authorized` endpoint.
     :returns: A dictionary with the user information.
     """
-    user_info_url = f"{remote.base_url}/api/oidc/userinfo"
-    user_info = remote.get(user_info_url).data
+    response = remote.get(_pocketid_app.user_info_url)
+    user_info = get_dict_from_response(response)
 
     handlers = current_oauthclient.signup_handlers[remote.name]
     # `remote` param automatically injected via `make_handler` helper
     return handlers["info_serializer"](resp, user_info)
+
+
+def get_dict_from_response(response):
+    """Check for errors in the response and return the resulting JSON."""
+    if getattr(response, "_resp") and response._resp.code > 400:
+        raise OAuthResponseError(
+            _("Application mis-configuration in Pocket ID"), None, response
+        )
+
+    return response.data
 
 
 @require_more_than_one_external_account
