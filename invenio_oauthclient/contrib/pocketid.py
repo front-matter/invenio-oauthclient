@@ -58,6 +58,7 @@ In templates you can add a sign in/up link:
 
 """
 
+import jwt
 from flask import current_app, redirect, url_for
 from flask_login import current_user
 from invenio_db import db
@@ -81,15 +82,11 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
         description=None,
         base_url=None,
         app_key=None,
-        access_token_url=None,
-        authorize_url=None,
         precedence_mask=None,
         signup_options=None,
     ):
         """Constructor."""
-        # Set base_url first
-        base_url = base_url or "https://demo.pocket-id.org/"
-
+        base_url = base_url or "https://demo.pocket-id.org"
         precedence_mask = precedence_mask or {
             "email": True,
         }
@@ -97,18 +94,17 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             "auto_confirm": True,
             "send_register_msg": False,
         }
-
         super().__init__(
             title or _("Pocket ID"),
             description
             or _(
-                "A simple and easy-to-use OIDC provider that allows users to authenticate with their passkeys to your services."
+                "A simple and easy-to-use OIDC provider that allows users to authenticate with their passkeys to your services.^"
             ),
-            app_key=app_key or "POCKETID_APP_CREDENTIALS",
-            base_url=base_url,
+            base_url,
+            app_key or "POCKETID_APP_CREDENTIALS",
             request_token_params={"scope": "openid profile email groups"},
-            access_token_url=access_token_url or f"{base_url}api/oidc/token",
-            authorize_url=authorize_url or f"{base_url}authorize",
+            access_token_url=f"{base_url}/api/oidc/token",
+            authorize_url=f"{base_url}/oidc/authorize",
             content_type="application/json",
             precedence_mask=precedence_mask,
             signup_options=signup_options,
@@ -143,8 +139,8 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
 
     @property
     def user_info_url(self):
-        """Return the URL to fetch user info."""
-        return f"{self.base_url}api/oidc/userinfo"
+        """User info URL."""
+        return f"{self.base_url}/oidc/userinfo"
 
     def get_handlers(self):
         """Return Pocket ID auth handlers."""
@@ -163,39 +159,6 @@ REMOTE_APP = _pocketid_app.remote_app
 
 REMOTE_REST_APP = _pocketid_app.remote_rest_app
 """Pocket ID Remote REST Application."""
-
-
-def get_user_info(remote):
-    """Get user information from Pocket ID userinfo endpoint.
-
-    :param remote: The remote application.
-    :returns: User information dictionary.
-    """
-    try:
-        response = remote.get(_pocketid_app.user_info_url)
-
-        if response.status_code >= 400:
-            raise OAuthResponseError(
-                _("Failed to fetch user information from Pocket ID"), None, response
-            )
-
-        user_info = response.data
-
-        # Validate required OIDC fields
-        if "sub" not in user_info:
-            raise OAuthResponseError(
-                _("Missing subject identifier in user info"), None, response
-            )
-
-        return user_info
-
-    except Exception as e:
-        if isinstance(e, OAuthResponseError):
-            raise
-        current_app.logger.error(f"Failed to fetch user info from Pocket ID: {str(e)}")
-        raise OAuthResponseError(
-            _("Failed to fetch user information"), None, None
-        ) from e
 
 
 def account_info_serializer(remote, resp, user_info, **kwargs):
@@ -227,13 +190,12 @@ def account_info(remote, resp):
 
         {
             'user': {
-                'email': '...',
                 'profile': {
-                    'username': '...',
-                    'full_name': '...',
+                    'full_name': 'Full Name',
                 },
+                'email': '<pocketid-email>',
             },
-            'external_id': 'pocket-id-sub-claim',
+            'external_id': '<pocketid-unique-identifier>',
             'external_method': 'pocketid',
         }
 
@@ -241,7 +203,7 @@ def account_info(remote, resp):
     :param resp: The response of the `authorized` endpoint.
     :returns: A dictionary with the user information.
     """
-    user_info_url = f"{remote.base_url}oidc/userinfo"
+    user_info_url = f"{remote.base_url}/api/oidc/userinfo"
     user_info = remote.get(user_info_url).data
 
     handlers = current_oauthclient.signup_handlers[remote.name]
@@ -258,21 +220,18 @@ def _disconnect(remote, *args, **kwargs):
     if not current_user.is_authenticated:
         return current_app.login_manager.unauthorized()
 
-    account = RemoteAccount.get(
+    remote_account = RemoteAccount.get(
         user_id=current_user.get_id(), client_id=remote.consumer_key
     )
-
-    # Remove external ID links
     external_ids = [
         i.id for i in current_user.external_identifiers if i.method == remote.name
     ]
 
     if external_ids:
         oauth_unlink_external_id(dict(id=external_ids[0], method=remote.name))
-
-    if account:
+    if remote_account:
         with db.session.begin_nested():
-            account.delete()
+            remote_account.delete()
 
 
 def disconnect_handler(remote, *args, **kwargs):
@@ -303,28 +262,15 @@ def account_setup(remote, token, resp):
     :param token: The token value.
     :param resp: The response.
     """
-    try:
-        user_info = get_user_info(remote)
+    info = account_info(remote, resp)
+    user_id = info["preferred_username"]
+    with db.session.begin_nested():
+        token.remote_account.extra_data = {
+            "id": user_id,
+        }
 
-        with db.session.begin_nested():
-            # Store comprehensive user data
-            token.remote_account.extra_data = {
-                "sub": user_info.get("sub"),
-                "email": user_info.get("email"),
-                "full_name": user_info.get("name", ""),
-                "username": user_info.get("preferred_username", ""),
-                "groups": user_info.get("groups", []),
-            }
-
-            # Create user <-> external id link using 'sub' claim
-            external_id = user_info.get("sub")
-            if external_id:
-                oauth_link_external_id(
-                    token.remote_account.user,
-                    dict(id=external_id, method=remote.name),
-                )
-
-    except Exception as e:
-        current_app.logger.error(f"Account setup failed: {str(e)}")
-        db.session.rollback()
-        raise
+        # Create user <-> external id link.
+        oauth_link_external_id(
+            token.remote_account.user,
+            dict(id=user_id, method=remote.name),
+        )
