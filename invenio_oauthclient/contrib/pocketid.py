@@ -241,7 +241,7 @@ def account_info(remote, resp):
     :param resp: The response of the `authorized` endpoint.
     :returns: A dictionary with the user information.
     """
-    user_info_url = f"{remote.base_url}/oidc/userinfo"
+    user_info_url = f"{remote.base_url}oidc/userinfo"
     user_info = remote.get(user_info_url).data
 
     handlers = current_oauthclient.signup_handlers[remote.name]
