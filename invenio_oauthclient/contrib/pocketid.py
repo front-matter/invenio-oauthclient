@@ -104,7 +104,7 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             app_key or "POCKETID_APP_CREDENTIALS",
             request_token_params={"scope": "openid profile email groups"},
             access_token_url=f"{base_url}/api/oidc/token",
-            authorize_url=f"{base_url}/oidc/authorize",
+            authorize_url=f"{base_url}/authorize",
             content_type="application/json",
             precedence_mask=precedence_mask,
             signup_options=signup_options,
