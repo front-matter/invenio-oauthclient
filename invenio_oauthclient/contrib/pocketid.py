@@ -100,6 +100,7 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             or _(
                 "A simple and easy-to-use OIDC provider that allows users to authenticate with their passkeys to your services."
             ),
+            base_url or "https://demo.pocket-id.org",
             app_key or "POCKETID_APP_CREDENTIALS",
             request_token_params={"scope": "/authenticate", "show_login": "true"},
             access_token_url=access_token_url,
