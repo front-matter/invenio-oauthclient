@@ -102,7 +102,6 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             ),
             app_key or "POCKETID_APP_CREDENTIALS",
             request_token_params={"scope": "/authenticate", "show_login": "true"},
-            base_url=base_url,
             access_token_url=access_token_url,
             authorize_url=authorize_url,
             content_type="application/json",
