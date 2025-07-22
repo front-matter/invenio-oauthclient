@@ -203,10 +203,10 @@ def account_info(remote, resp):
     :param resp: The response of the `authorized` endpoint.
     :returns: A dictionary with the user information.
     """
-    print(_pocketid_app.user_info_url)
-    try:
-        response = remote.get(_pocketid_app.user_info_url)
-        user_info = get_dict_from_response(response)
+    try:  #
+        user_info_url = f"{remote.base_url}/oidc/userinfo"
+        print("user_info_url:", user_info_url)
+        user_info = remote.get(user_info_url).data
     except Exception as e:
         print(f"Error fetching user info: {e}")
         user_info = {}
