@@ -86,7 +86,7 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
         signup_options=None,
     ):
         """Constructor."""
-        base_url = base_url or "https://demo.pocket-id.org"
+        base_url or "https://demo.pocket-id.org"
         precedence_mask = precedence_mask or {
             "email": True,
         }
