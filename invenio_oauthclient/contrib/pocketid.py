@@ -89,7 +89,7 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
         """Constructor."""
         # Set base_url first
         base_url = base_url or "https://demo.pocket-id.org"
-        
+
         precedence_mask = precedence_mask or {
             "email": True,
         }
@@ -104,8 +104,8 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             or _(
                 "A simple and easy-to-use OIDC provider that allows users to authenticate with their passkeys to your services."
             ),
+            app_key=app_key or "POCKETID_APP_CREDENTIALS",
             base_url=base_url,
-            app_key or "POCKETID_APP_CREDENTIALS",
             request_token_params={"scope": "openid profile email groups"},
             access_token_url=access_token_url or f"{base_url}/api/oidc/token",
             authorize_url=authorize_url or f"{base_url}/authorize",
@@ -167,28 +167,28 @@ REMOTE_REST_APP = _pocketid_app.remote_rest_app
 
 def get_user_info(remote):
     """Get user information from Pocket ID userinfo endpoint.
-    
+
     :param remote: The remote application.
     :returns: User information dictionary.
     """
     try:
         response = remote.get(_pocketid_app.user_info_url)
-        
+
         if response.status_code >= 400:
             raise OAuthResponseError(
                 _("Failed to fetch user information from Pocket ID"), None, response
             )
-        
+
         user_info = response.data
-        
+
         # Validate required OIDC fields
-        if 'sub' not in user_info:
+        if "sub" not in user_info:
             raise OAuthResponseError(
                 _("Missing subject identifier in user info"), None, response
             )
-            
+
         return user_info
-        
+
     except Exception as e:
         if isinstance(e, OAuthResponseError):
             raise
@@ -208,12 +208,12 @@ def account_info_serializer(remote, resp, user_info=None, **kwargs):
     """
     if not user_info:
         raise ValueError("User info is required for account serialization")
-    
+
     # Extract external ID from 'sub' claim (standard OIDC)
-    external_id = user_info.get('sub')
+    external_id = user_info.get("sub")
     if not external_id:
         raise ValueError("Subject identifier (sub) is required")
-    
+
     return {
         "external_id": external_id,
         "external_method": remote.name,
@@ -252,11 +252,11 @@ def account_info(remote, resp):
     """
     try:
         user_info = get_user_info(remote)
-        
+
         handlers = current_oauthclient.signup_handlers[remote.name]
         # `remote` param automatically injected via `make_handler` helper
         return handlers["info_serializer"](resp, user_info=user_info)
-        
+
     except Exception as e:
         current_app.logger.error(f"Failed to get account info: {str(e)}")
         raise
@@ -274,7 +274,7 @@ def _disconnect(remote, *args, **kwargs):
     account = RemoteAccount.get(
         user_id=current_user.get_id(), client_id=remote.consumer_key
     )
-    
+
     # Remove external ID links
     external_ids = [
         i.id for i in current_user.external_identifiers if i.method == remote.name
@@ -318,7 +318,7 @@ def account_setup(remote, token, resp):
     """
     try:
         user_info = get_user_info(remote)
-        
+
         with db.session.begin_nested():
             # Store comprehensive user data
             token.remote_account.extra_data = {
@@ -336,7 +336,7 @@ def account_setup(remote, token, resp):
                     token.remote_account.user,
                     dict(id=external_id, method=remote.name),
                 )
-                
+
     except Exception as e:
         current_app.logger.error(f"Account setup failed: {str(e)}")
         db.session.rollback()
