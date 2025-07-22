@@ -203,8 +203,13 @@ def account_info(remote, resp):
     :param resp: The response of the `authorized` endpoint.
     :returns: A dictionary with the user information.
     """
-    response = remote.get(_pocketid_app.user_info_url)
-    user_info = get_dict_from_response(response)
+    print(_pocketid_app.user_info_url)
+    try:
+        response = remote.get(_pocketid_app.user_info_url)
+        user_info = get_dict_from_response(response)
+    except Exception as e:
+        print(f"Error fetching user info: {e}")
+        user_info = {}
 
     handlers = current_oauthclient.signup_handlers[remote.name]
     # `remote` param automatically injected via `make_handler` helper
