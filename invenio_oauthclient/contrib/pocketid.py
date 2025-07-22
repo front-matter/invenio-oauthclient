@@ -102,7 +102,7 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             ),
             base_url or "https://demo.pocket-id.org",
             app_key or "POCKETID_APP_CREDENTIALS",
-            request_token_params={"scope": "openid profile email"},
+            request_token_params={"scope": "openid profile email groups"},
             access_token_url=f"{base_url}api/oidc/token",
             authorize_url=f"{base_url}authorize",
             content_type="application/json",
@@ -136,6 +136,11 @@ class PocketIDOAuthSettingsHelper(OAuthSettingsHelper):
             signup_redirect_url="/",
             error_redirect_url="/",
         )
+
+    @property
+    def user_info_url(self):
+        """Return the URL to fetch user info."""
+        return f"{self.base_url}api/oidc/userinfo"
 
     def get_handlers(self):
         """Return Pocket ID auth handlers."""
