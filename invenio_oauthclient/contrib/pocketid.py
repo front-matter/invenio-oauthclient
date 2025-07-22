@@ -204,9 +204,11 @@ def account_info(remote, resp):
     :returns: A dictionary with the user information.
     """
     try:  #
+        print("base_url:", remote.base_url)
         user_info_url = f"{remote.base_url}oidc/userinfo"
-        print("user_info_url:", user_info_url)
-        user_info = remote.get(user_info_url).data
+        response = remote.get(user_info_url)
+        user_info = get_dict_from_response(response)
+        print("user_info:", user_info)
     except Exception as e:
         print(f"Error fetching user info: {e}")
         user_info = {}
