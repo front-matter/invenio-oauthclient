@@ -29,6 +29,10 @@ from invenio_userprofiles.views import create_blueprint
 from sqlalchemy_utils.functions import create_database, database_exists, drop_database
 
 from invenio_oauthclient import InvenioOAuthClient, InvenioOAuthClientREST
+from invenio_oauthclient.contrib.authentik import REMOTE_APP as AUTHENTIK_REMOTE_APP
+from invenio_oauthclient.contrib.authentik import (
+    REMOTE_REST_APP as AUTHENTIK_REMOTE_REST_APP,
+)
 from invenio_oauthclient.contrib.cern_openid import REMOTE_APP as CERN_OPENID_REMOTE_APP
 from invenio_oauthclient.contrib.cern_openid import (
     REMOTE_REST_APP as CERN_OPENID_REMOTE_REST_APP,
@@ -74,6 +78,7 @@ def base_app(request):
         CELERY_TASK_ALWAYS_EAGER=True,
         OAUTHCLIENT_SIGNUP_FORM=_create_registrationform,
         OAUTHCLIENT_REMOTE_APPS=dict(
+            authentik=AUTHENTIK_REMOTE_APP,
             cern_openid=CERN_OPENID_REMOTE_APP,
             orcid=ORCID_REMOTE_APP,
             github=GITHUB_REMOTE_APP,
@@ -82,12 +87,18 @@ def base_app(request):
             eosc_aai=EOSC_AAI_REMOTE_APP,
         ),
         OAUTHCLIENT_REST_REMOTE_APPS=dict(
+            authentik=AUTHENTIK_REMOTE_REST_APP,
             cern_openid=CERN_OPENID_REMOTE_REST_APP,
             orcid=ORCID_REMOTE_REST_APP,
             github=GITHUB_REMOTE_REST_APP,
             globus=GLOBUS_REMOTE_REST_APP,
         ),
         OAUTHCLIENT_STATE_EXPIRES=300,
+        AUTHENTIK_BASE_URL="http://localhost:9000",
+        AUTHENTIK_APP_CREDENTIALS=dict(
+            consumer_key="authentik_key_changeme",
+            consumer_secret="authentik_secret_changeme",
+        ),
         GITHUB_APP_CREDENTIALS=dict(
             consumer_key="github_key_changeme",
             consumer_secret="github_secret_changeme",
@@ -343,11 +354,6 @@ def views_fixture(base_app, params, models_fixture):
                 title="Hidden",
                 hide=True,
             ),
-            link_only=dict(
-                params=params("linkonlyid"),
-                title="Link only",
-                link_only=True,
-            ),
         )
     )
 
@@ -394,17 +400,48 @@ def views_fixture_rest(base_app, params, models_fixture):
                 title="Hidden",
                 hide=True,
             ),
-            link_only=dict(
-                params=params("linkonlyid"),
-                authorized_redirect_url="/",
-                disconnect_redirect_url="/",
-                signup_redirect_url="/",
-                error_redirect_url="/",
-                title="Link only",
-                link_only=True,
-            ),
         )
     )
+
+
+@pytest.fixture
+def example_authentik(request):
+    """Authentik example data."""
+    # OAuth response
+    example_response = {
+        "access_token": "test_access_token",
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "refresh_token": "test_refresh_token",
+        "scope": "openid profile email",
+        "id_token": "header.test-oidc-token.signature",
+    }
+
+    # Userinfo endpoint response
+    example_userinfo = {
+        "sub": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "email": "jsmith@example.com",
+        "email_verified": True,
+        "name": "John Smith",
+        "preferred_username": "jsmith",
+        "given_name": "John",
+        "family_name": "Smith",
+    }
+
+    # Expected account info
+    expected_info = {
+        "external_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "external_method": "authentik",
+        "user": {
+            "email": "jsmith@example.com",
+            "profile": {
+                "username": "jsmith",
+                "full_name": "John Smith",
+            },
+        },
+    }
+
+    return example_response, example_userinfo, expected_info
 
 
 @pytest.fixture
