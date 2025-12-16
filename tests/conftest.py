@@ -39,6 +39,8 @@ from invenio_oauthclient.contrib.github import REMOTE_REST_APP as GITHUB_REMOTE_
 from invenio_oauthclient.contrib.globus import REMOTE_APP as GLOBUS_REMOTE_APP
 from invenio_oauthclient.contrib.globus import REMOTE_REST_APP as GLOBUS_REMOTE_REST_APP
 from invenio_oauthclient.contrib.keycloak import KeycloakSettingsHelper
+from invenio_oauthclient.contrib.oidc import REMOTE_APP as OIDC_REMOTE_APP
+from invenio_oauthclient.contrib.oidc import REMOTE_REST_APP as OIDC_REMOTE_REST_APP
 from invenio_oauthclient.contrib.orcid import REMOTE_APP as ORCID_REMOTE_APP
 from invenio_oauthclient.contrib.orcid import REMOTE_REST_APP as ORCID_REMOTE_REST_APP
 from invenio_oauthclient.utils import _create_registrationform
@@ -74,6 +76,7 @@ def base_app(request):
         CELERY_TASK_ALWAYS_EAGER=True,
         OAUTHCLIENT_SIGNUP_FORM=_create_registrationform,
         OAUTHCLIENT_REMOTE_APPS=dict(
+            oidc=OIDC_REMOTE_APP,
             cern_openid=CERN_OPENID_REMOTE_APP,
             orcid=ORCID_REMOTE_APP,
             github=GITHUB_REMOTE_APP,
@@ -82,12 +85,18 @@ def base_app(request):
             eosc_aai=EOSC_AAI_REMOTE_APP,
         ),
         OAUTHCLIENT_REST_REMOTE_APPS=dict(
+            oidc=OIDC_REMOTE_REST_APP,
             cern_openid=CERN_OPENID_REMOTE_REST_APP,
             orcid=ORCID_REMOTE_REST_APP,
             github=GITHUB_REMOTE_REST_APP,
             globus=GLOBUS_REMOTE_REST_APP,
         ),
         OAUTHCLIENT_STATE_EXPIRES=300,
+        OIDC_ISSUER="http://localhost:9000",
+        OIDC_APP_CREDENTIALS=dict(
+            consumer_key="oidc_key_changeme",
+            consumer_secret="oidc_secret_changeme",
+        ),
         GITHUB_APP_CREDENTIALS=dict(
             consumer_key="github_key_changeme",
             consumer_secret="github_secret_changeme",
@@ -391,6 +400,46 @@ def views_fixture_rest(base_app, params, models_fixture):
             ),
         )
     )
+
+
+@pytest.fixture
+def example_oidc(request):
+    """OIDC example data."""
+    # OAuth response
+    example_response = {
+        "access_token": "test_access_token",
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "refresh_token": "test_refresh_token",
+        "scope": "openid profile email",
+        "id_token": "header.test-oidc-token.signature",
+    }
+
+    # Userinfo endpoint response
+    example_userinfo = {
+        "sub": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "email": "jsmith@example.com",
+        "email_verified": True,
+        "name": "John Smith",
+        "preferred_username": "jsmith",
+        "given_name": "John",
+        "family_name": "Smith",
+    }
+
+    # Expected account info
+    expected_info = {
+        "external_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "external_method": "oidc",
+        "user": {
+            "email": "jsmith@example.com",
+            "profile": {
+                "username": "jsmith",
+                "full_name": "John Smith",
+            },
+        },
+    }
+
+    return example_response, example_userinfo, expected_info
 
 
 @pytest.fixture
