@@ -34,6 +34,7 @@ from invenio_oauthclient.contrib.github import REMOTE_REST_APP as GITHUB_REMOTE_
 from invenio_oauthclient.contrib.globus import REMOTE_APP as GLOBUS_REMOTE_APP
 from invenio_oauthclient.contrib.globus import REMOTE_REST_APP as GLOBUS_REMOTE_REST_APP
 from invenio_oauthclient.contrib.keycloak import KeycloakSettingsHelper
+from invenio_oauthclient.contrib.oidc import OIDCSettingsHelper
 from invenio_oauthclient.contrib.orcid import REMOTE_APP as ORCID_REMOTE_APP
 from invenio_oauthclient.contrib.orcid import REMOTE_REST_APP as ORCID_REMOTE_REST_APP
 from invenio_oauthclient.utils import _create_registrationform
@@ -58,6 +59,14 @@ def base_app(request):
     )
     KEYCLOAK_REMOTE_APP = helper.remote_app
 
+    oidc_helper = OIDCSettingsHelper(
+        issuer="https://auth.example.com",
+        use_discovery=False,
+        signup_options={"auto_confirm": True},
+    )
+    OIDC_REMOTE_APP = oidc_helper.remote_app
+    OIDC_REMOTE_REST_APP = oidc_helper.remote_rest_app
+
     instance_path = tempfile.mkdtemp()
     base_app = Flask("testapp")
     base_app.config.update(
@@ -75,12 +84,14 @@ def base_app(request):
             globus=GLOBUS_REMOTE_APP,
             keycloak=KEYCLOAK_REMOTE_APP,
             eosc_aai=EOSC_AAI_REMOTE_APP,
+            oidc=OIDC_REMOTE_APP,
         ),
         OAUTHCLIENT_REST_REMOTE_APPS=dict(
             cern_openid=CERN_OPENID_REMOTE_REST_APP,
             orcid=ORCID_REMOTE_REST_APP,
             github=GITHUB_REMOTE_REST_APP,
             globus=GLOBUS_REMOTE_REST_APP,
+            oidc=OIDC_REMOTE_REST_APP,
         ),
         OAUTHCLIENT_STATE_EXPIRES=300,
         GITHUB_APP_CREDENTIALS=dict(
@@ -103,6 +114,11 @@ def base_app(request):
             consumer_key="eosc_aai_key_changeme",
             consumer_secret="eosc_aai_secret_changeme",
         ),
+        OIDC_APP_CREDENTIALS=dict(
+            consumer_key="oidc_key_changeme",
+            consumer_secret="oidc_secret_changeme",
+        ),
+        OIDC_ISSUER="https://auth.example.com",
         TEST_APP_CREDENTIALS=dict(
             consumer_key="test_key_changeme",
             consumer_secret="test_secret_changeme",
@@ -535,6 +551,42 @@ def example_eosc_aai():
     }
 
     return example_data, example_account_info
+
+
+@pytest.fixture
+def example_oidc():
+    """Example OIDC response and expected serialized account info."""
+    response = {
+        "access_token": "test_access_token",
+        "refresh_token": "test_refresh_token",
+        "expires_in": 3599,
+        "token_type": "Bearer",
+        "scope": "openid profile email",
+        "id_token": "header.payload.signature",
+    }
+
+    user_info = {
+        "sub": "oidc-user-123",
+        "email": "carberry@inveniosoftware.org",
+        "name": "Josiah Carberry",
+        "preferred_username": "carberry@inveniosoftware.org",
+        "given_name": "Josiah",
+        "family_name": "Carberry",
+    }
+
+    expected_info = {
+        "external_id": "oidc-user-123",
+        "external_method": "oidc",
+        "user": {
+            "email": "carberry@inveniosoftware.org",
+            "profile": {
+                "username": "carberry@inveniosoftware.org",
+                "full_name": "Josiah Carberry",
+            },
+        },
+    }
+
+    return response, user_info, expected_info
 
 
 @pytest.fixture(scope="session")
